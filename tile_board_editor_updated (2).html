@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tile Board Editor — Local</title>
+  <style>
+    :root{
+      --cell-size:36px;
+      --gap:2px;
+      --ui-bg:#f4f6f8;
+      --panel-bg:#ffffff;
+      --accent:#2563eb;
+      --muted:#6b7280;
+      --shadow: 0 4px 14px rgba(16,24,40,0.06);
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial,sans-serif}
+    body{margin:16px;background:linear-gradient(180deg,#f8fafc, #eef2ff);color:#0f172a}
+    h1{font-size:18px;margin:0 0 8px}
+    .app{display:grid;grid-template-columns:360px 1fr;gap:16px}
+    .panel{background:var(--panel-bg);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
+    .controls{display:flex;flex-direction:column;gap:10px}
+    label{font-size:13px;color:var(--muted)}
+    input[type=number]{width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef}
+    button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(37,99,235,0.12)}
+    .tile-types{display:flex;gap:8px;flex-wrap:wrap}
+    .type{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:10px;border:1px solid #eceff6;cursor:pointer}
+    .type.active{outline:2px solid rgba(37,99,235,0.15);box-shadow:0 1px 0 rgba(0,0,0,0.02)}
+    .board-wrap{display:flex;flex-direction:column;gap:8px}
+    .boards{display:flex;gap:10px;align-items:flex-start}
+    .board{background:var(--ui-bg);padding:12px;border-radius:10px}
+    .grid{display:inline-grid;border-radius:6px;padding:4px;background:white}
+    .cell{width:var(--cell-size);height:var(--cell-size);display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:16px;cursor:pointer;user-select:none}
+    .cell.empty{background:transparent}
+    .palette-swatch{width:18px;height:18px;border-radius:4px;display:inline-block;vertical-align:middle}
+    .controls-row{display:flex;gap:8px;flex-wrap:wrap}
+    .levels-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto}
+    .level-item{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:8px;border:1px solid #eef2f8;background:#fff}
+    .small{font-size:12px;color:var(--muted)}
+    footer{margin-top:12px;font-size:12px;color:var(--muted)}
+    .road{background:linear-gradient(180deg,#fff7ed,#fff1e6);border:1px solid #f6ad55}
+    .prop{background:linear-gradient(180deg,#f0fdf4,#ecfdf3);border:1px solid #34d399}
+    .landmark{background:linear-gradient(180deg,#eef2ff,#e8f0ff);border:1px solid #60a5fa}
+    .block{background:linear-gradient(180deg,#fff1f2,#fff5f6);border:1px solid #f87171}
+    .mandatory{background:linear-gradient(180deg,#fef9c3,#fef08a);border:1px solid #eab308}
+    .empty{background:transparent;border:1px dashed rgba(15,23,42,0.06)}
+    @media (max-width:920px){.app{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="panel">
+      <h1>Tile Board Editor (local single-file)</h1>
+      <div class="controls">
+        <div class="controls-row">
+          <div style="flex:1">
+            <label>Columns</label>
+            <input id="cols" type="number" min="3" max="60" value="23">
+          </div>
+          <div style="width:120px">
+            <label>Rows</label>
+            <input id="rows" type="number" min="3" max="60" value="15">
+          </div>
+        </div>
+        <div class="controls-row">
+          <button id="newBoard">New Board</button>
+          <button id="duplicate" class="ghost">Duplicate Level</button>
+          <button id="clear" class="ghost">Clear</button>
+        </div>
+
+        <div>
+          <label>Brush / Cycle mode</label>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button id="modeCycle" class="type active">Cycle on click</button>
+            <button id="modeBrush" class="type">Brush (paint)</button>
+          </div>
+        </div>
+
+        <div>
+          <label>Tile types</label>
+          <div class="tile-types" id="tileTypes"></div>
+        </div>
+
+        <div>
+          <label>Levels</label>
+          <div class="levels-list" id="levelsList"></div>
+        </div>
+
+        <div>
+          <label>Compare Levels</label>
+          <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
+            <select id="compareSelect1"></select>
+            <select id="compareSelect2"></select>
+            <button id="compareBtn" class="ghost">Show</button>
+            <button id="hideCompare" class="ghost" style="display:none">Hide</button>
+          </div>
+        </div>
+
+        <div>
+          <label>Save / Load</label>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button id="exportAll">Download JSON</button>
+            <input id="importFile" type="file" accept="application/json" style="display:none">
+            <button id="importBtn" class="ghost">Load JSON</button>
+          </div>
+          <div style="margin-top:8px" class="small">You can also export a single level by selecting it and clicking the download icon next to it.</div>
+        </div>
+
+        <footer>
+          <div class="small">Open the file in your browser to run locally. Works offline.</div>
+        </footer>
+      </div>
+    </div>
+
+    <div class="panel board-wrap">
+      <div class="row-between">
+        <div class="small">Active Level: <span id="activeLabel">Level 1</span></div>
+      </div>
+      <div class="boards" id="boardsContainer"></div>
+    </div>
+  </div>
+
+  <script>
+    const TILE_TYPES = [
+      {key:'empty', label:'Empty', emoji:'', class:'empty'},
+      {key:'road', label:'Road', emoji:'🛣️', class:'road'},
+      {key:'prop', label:'Prop', emoji:'🏠', class:'prop'},
+      {key:'landmark', label:'Landmark', emoji:'⛰️', class:'landmark'},
+      {key:'block', label:'Blocking', emoji:'🚫', class:'block'},
+      {key:'mandatory', label:'Mandatory', emoji:'⭐', class:'mandatory'},
+    ];
+
+    let boards=[]; let activeIndex=0; let brush=null; let mode='cycle'; let isMouseDown=false;
+
+    const colsIn=document.getElementById('cols');
+    const rowsIn=document.getElementById('rows');
+    const tileTypesEl=document.getElementById('tileTypes');
+    const boardsContainer=document.getElementById('boardsContainer');
+    const levelsList=document.getElementById('levelsList');
+    const newBoardBtn=document.getElementById('newBoard');
+    const duplicateBtn=document.getElementById('duplicate');
+    const clearBtn=document.getElementById('clear');
+    const exportAllBtn=document.getElementById('exportAll');
+    const importBtn=document.getElementById('importBtn');
+    const importFile=document.getElementById('importFile');
+    const modeCycle=document.getElementById('modeCycle');
+    const modeBrush=document.getElementById('modeBrush');
+    const compareSelect1=document.getElementById('compareSelect1');
+    const compareSelect2=document.getElementById('compareSelect2');
+    const compareBtn=document.getElementById('compareBtn');
+    const hideCompare=document.getElementById('hideCompare');
+    const activeLabel=document.getElementById('activeLabel');
+
+    function makeEmptyTiles(cols,rows){return Array.from({length:rows},()=>Array(cols).fill('empty'))}
+    function createBoard(name,cols,rows){return{name,cols,rows,tiles:makeEmptyTiles(cols,rows)}}
+
+    function setupTileTypes(){tileTypesEl.innerHTML='';TILE_TYPES.forEach(tt=>{const d=document.createElement('div');d.className='type';d.title=tt.label;d.dataset.key=tt.key;d.innerHTML=`<span class='palette-swatch ${tt.class}'></span> <div>${tt.emoji||''} ${tt.label}</div>`;d.addEventListener('click',()=>{document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));d.classList.add('active');brush=tt.key;mode='brush';modeBrush.classList.add('active');modeCycle.classList.remove('active');});tileTypesEl.appendChild(d);});}
+
+    function renderBoards(){boardsContainer.innerHTML='';const board=boards[activeIndex];if(!board)return;activeLabel.textContent=board.name||`Level ${activeIndex+1}`;const grid=document.createElement('div');grid.className='grid';grid.style.gridTemplateColumns=`repeat(${board.cols}, var(--cell-size))`;for(let r=0;r<board.rows;r++){for(let c=0;c<board.cols;c++){const t=board.tiles[r][c]||'empty';const cell=document.createElement('div');cell.className='cell '+t;const typeDef=TILE_TYPES.find(x=>x.key===t);cell.textContent=typeDef?.emoji||'';cell.addEventListener('mousedown',()=>{isMouseDown=true;if(mode==='cycle')cycleCell(r,c);else if(mode==='brush')applyBrush(r,c);renderBoards();});cell.addEventListener('mouseenter',()=>{if(isMouseDown&&mode==='brush'){applyBrush(r,c);renderBoards();}});cell.addEventListener('mouseup',()=>{isMouseDown=false;});grid.appendChild(cell);}}boardsContainer.appendChild(grid);renderLevelsList();renderCompareSelects();}
+
+    function renderLevelsList(){levelsList.innerHTML='';boards.forEach((b,i)=>{const item=document.createElement('div');item.className='level-item';const left=document.createElement('div');left.style.display='flex';left.style.flexDirection='column';const name=document.createElement('div');name.textContent=b.name||`Level ${i+1}`;const meta=document.createElement('div');meta.className='small';meta.textContent=`${b.cols}×${b.rows}`;left.append(name,meta);const right=document.createElement('div');right.style.display='flex';right.style.gap='6px';const openBtn=document.createElement('button');openBtn.textContent='Open';openBtn.className='ghost';openBtn.addEventListener('click',()=>{activeIndex=i;renderBoards();});const downloadBtn=document.createElement('button');downloadBtn.textContent='⬇';downloadBtn.title='Download this level';downloadBtn.addEventListener('click',()=>{downloadJSON({levels:[b]},`${b.name||'level-'+(i+1)}.json`);});const del=document.createElement('button');del.textContent='✖';del.className='ghost';del.addEventListener('click',()=>{if(confirm('Delete level?')){boards.splice(i,1);if(activeIndex>=boards.length)activeIndex=boards.length-1;renderBoards();}});right.append(openBtn,downloadBtn,del);item.append(left,right);levelsList.appendChild(item);});}
+
+    function renderCompareSelects(){compareSelect1.innerHTML='';compareSelect2.innerHTML='';boards.forEach((b,i)=>{const o1=document.createElement('option');o1.value=i;o1.textContent=b.name||`Level ${i+1}`;const o2=o1.cloneNode(true);compareSelect1.appendChild(o1);compareSelect2.appendChild(o2);});compareSelect1.value=activeIndex;compareSelect2.value=Math.min(boards.length-1,activeIndex+1);}
+
+    function cycleCell(r,c){const b=boards[activeIndex];const current=b.tiles[r][c];const idx=TILE_TYPES.findIndex(x=>x.key===current);const next=TILE_TYPES[(idx+1)%TILE_TYPES.length].key;b.tiles[r][c]=next;}
+    function applyBrush(r,c){if(!brush)return;boards[activeIndex].tiles[r][c]=brush;}
+    function makeEmptyTiles(cols,rows){return Array.from({length:rows},()=>Array(cols).fill('empty'))}
+
+    newBoardBtn.addEventListener('click',()=>{const cols=Math.max(3,Math.min(60,+colsIn.value||23));const rows=Math.max(3,Math.min(60,+rowsIn.value||15));const idx=boards.push(createBoard(`Level ${boards.length+1}`,cols,rows))-1;activeIndex=idx;renderBoards();});
+    duplicateBtn.addEventListener('click',()=>{const src=boards[activeIndex];const copy=JSON.parse(JSON.stringify(src));copy.name=src.name+' (copy)';boards.push(copy);activeIndex=boards.length-1;renderBoards();});
+    clearBtn.addEventListener('click',()=>{if(!confirm('Clear current level?'))return;const b=boards[activeIndex];b.tiles=makeEmptyTiles(b.cols,b.rows);renderBoards();});
+
+    function downloadJSON(obj,filename='levels.json'){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);}
+
+    exportAllBtn.addEventListener('click',()=>{downloadJSON({levels:boards},'tile-levels.json');});
+
+    importBtn.addEventListener('click',()=>importFile.click());
+    importFile.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(reader.result);if(data.levels&&Array.isArray(data.levels)){data.levels.forEach(l=>{if(l.cols&&l.rows&&Array.isArray(l.tiles))boards.push(l);});activeIndex=Math.max(0,boards.length-1);setupTileTypes();renderBoards();alert('Loaded '+data.levels.length+' levels');}else alert('JSON must contain { levels: [...] }');}catch(err){alert('Invalid JSON file');}};reader.readAsText(f);});
+
+    compareBtn.addEventListener('click',()=>{const i1=+compareSelect1.value;const i2=+compareSelect2.value;if(i1===i2){alert('Pick two different levels to compare');return;}window._compareShown=true;window._compareIndex2=i2;activeIndex=i1;hideCompare.style.display='inline-block';renderBoards();});
+    hideCompare.addEventListener('click',()=>{window._compareShown=false;hideCompare.style.display='none';renderBoards();});
+
+    modeCycle.addEventListener('click',()=>{mode='cycle';modeCycle.classList.add('active');modeBrush.classList.remove('active');brush=null;document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));});
+    modeBrush.addEventListener('click',()=>{mode='brush';modeBrush.classList.add('active');modeCycle.classList.remove('active');});
+
+    function init(){setupTileTypes();boards=[createBoard('Level 1',+colsIn.value,+rowsIn.value)];activeIndex=0;renderBoards();}
+    init();
+  </script>
+</body>
+</html>
