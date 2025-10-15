@@ -39,12 +39,19 @@
     .level-item{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:8px;border:1px solid #eef2f8;background:#fff}
     .small{font-size:12px;color:var(--muted)}
     footer{margin-top:12px;font-size:12px;color:var(--muted)}
+
+    /* existing tiles */
     .road{background:linear-gradient(180deg,#fff7ed,#fff1e6);border:1px solid #f6ad55}
     .prop{background:linear-gradient(180deg,#f0fdf4,#ecfdf3);border:1px solid #34d399}
     .landmark{background:linear-gradient(180deg,#eef2ff,#e8f0ff);border:1px solid #60a5fa}
     .block{background:linear-gradient(180deg,#fff1f2,#fff5f6);border:1px solid #f87171}
     .mandatory{background:linear-gradient(180deg,#fef9c3,#fef08a);border:1px solid #eab308}
     .empty{background:transparent;border:1px dashed rgba(15,23,42,0.06)}
+
+    /* ✅ new road variants */
+    .doubleRoad{background:linear-gradient(180deg,#e0f2fe,#bae6fd);border:1px solid #38bdf8;}
+    .avenue{background:linear-gradient(180deg,#dcfce7,#bbf7d0);border:1px solid #4ade80;}
+
     @media (max-width:920px){.app{grid-template-columns:1fr;}}
   </style>
 </head>
@@ -53,6 +60,8 @@
     <div class="panel">
       <h1>Tile Board Editor (local single-file)</h1>
       <div class="controls">
+
+        <!-- unchanged UI -->
         <div class="controls-row">
           <div style="flex:1">
             <label>Columns</label>
@@ -107,13 +116,16 @@
           <div style="margin-top:8px" class="small">You can also export a single level by selecting it and clicking the download icon next to it.</div>
         </div>
 
-        <!-- ✅ Added Road Stats Section -->
+        <!-- ✅ Updated Road Stats Section -->
         <div>
           <label>Road Statistics</label>
           <div class="small" id="roadStats">
             Right turns: <span id="rightTurns">0</span><br>
             Left turns: <span id="leftTurns">0</span><br>
-            Crossways: <span id="crossways">0</span>
+            Crossways: <span id="crossways">0</span><br>
+            Roads: <span id="roadCount">0</span><br>
+            Double Roads: <span id="doubleRoadCount">0</span><br>
+            Avenues: <span id="avenueCount">0</span>
           </div>
         </div>
 
@@ -132,9 +144,12 @@
   </div>
 
   <script>
+    /* ✅ Added new road types */
     const TILE_TYPES = [
       {key:'empty', label:'Empty', emoji:'', class:'empty'},
       {key:'road', label:'Road', emoji:'🛣️', class:'road'},
+      {key:'doubleRoad', label:'Double Road', emoji:'🛣️', class:'doubleRoad'},
+      {key:'avenue', label:'Avenue', emoji:'🛣️', class:'avenue'},
       {key:'prop', label:'Prop', emoji:'🏠', class:'prop'},
       {key:'landmark', label:'Landmark', emoji:'⛰️', class:'landmark'},
       {key:'block', label:'Blocking', emoji:'🚫', class:'block'},
@@ -175,7 +190,6 @@
 
     function cycleCell(r,c){const b=boards[activeIndex];const current=b.tiles[r][c];const idx=TILE_TYPES.findIndex(x=>x.key===current);const next=TILE_TYPES[(idx+1)%TILE_TYPES.length].key;b.tiles[r][c]=next;}
     function applyBrush(r,c){if(!brush)return;boards[activeIndex].tiles[r][c]=brush;}
-    function makeEmptyTiles(cols,rows){return Array.from({length:rows},()=>Array(cols).fill('empty'))}
 
     newBoardBtn.addEventListener('click',()=>{const cols=Math.max(3,Math.min(60,+colsIn.value||23));const rows=Math.max(3,Math.min(60,+rowsIn.value||15));const idx=boards.push(createBoard(`Level ${boards.length+1}`,cols,rows))-1;activeIndex=idx;renderBoards();});
     duplicateBtn.addEventListener('click',()=>{const src=boards[activeIndex];const copy=JSON.parse(JSON.stringify(src));copy.name=src.name+' (copy)';boards.push(copy);activeIndex=boards.length-1;renderBoards();});
@@ -194,19 +208,27 @@
     modeCycle.addEventListener('click',()=>{mode='cycle';modeCycle.classList.add('active');modeBrush.classList.remove('active');brush=null;document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));});
     modeBrush.addEventListener('click',()=>{mode='brush';modeBrush.classList.add('active');modeCycle.classList.remove('active');});
 
-    /* ✅ Added counting logic for right turns, left turns, crossways */
+    /* ✅ Updated counting logic to include all road types */
     function countRoadStats(board) {
       let right = 0, left = 0, cross = 0;
-      const dirs = [[-1,0],[1,0],[0,-1],[0,1]]; // up, down, left, right
+      let roadCount=0, doubleRoadCount=0, avenueCount=0;
+      const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
       const inBounds = (r,c) => r>=0 && c>=0 && r<board.rows && c<board.cols;
-      
+      const roadTypes = ['road','doubleRoad','avenue'];
+
       for (let r=0; r<board.rows; r++) {
         for (let c=0; c<board.cols; c++) {
-          if (board.tiles[r][c] !== 'road') continue;
+          const tile=board.tiles[r][c];
+          if (!roadTypes.includes(tile)) continue;
+
+          if (tile==='road') roadCount++;
+          else if (tile==='doubleRoad') doubleRoadCount++;
+          else if (tile==='avenue') avenueCount++;
+
           let connected = [];
           for (let [dr,dc] of dirs) {
             const rr = r+dr, cc = c+dc;
-            if (inBounds(rr,cc) && board.tiles[rr][cc] === 'road') connected.push([dr,dc]);
+            if (inBounds(rr,cc) && roadTypes.includes(board.tiles[rr][cc])) connected.push([dr,dc]);
           }
           if (connected.length === 4) cross++;
           else if (connected.length === 2) {
@@ -223,6 +245,9 @@
       document.getElementById('rightTurns').textContent = right;
       document.getElementById('leftTurns').textContent = left;
       document.getElementById('crossways').textContent = cross;
+      document.getElementById('roadCount').textContent = roadCount;
+      document.getElementById('doubleRoadCount').textContent = doubleRoadCount;
+      document.getElementById('avenueCount').textContent = avenueCount;
     }
 
     const oldRenderBoards = renderBoards;
