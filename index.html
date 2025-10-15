@@ -208,9 +208,9 @@
     modeCycle.addEventListener('click',()=>{mode='cycle';modeCycle.classList.add('active');modeBrush.classList.remove('active');brush=null;document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));});
     modeBrush.addEventListener('click',()=>{mode='brush';modeBrush.classList.add('active');modeCycle.classList.remove('active');});
 
-    /* ✅ Updated counting logic to include all road types */
+    /* ✅ Updated counting logic to include T-shapes */
     function countRoadStats(board) {
-      let right = 0, left = 0, cross = 0;
+      let right = 0, left = 0, cross = 0, tshape = 0;
       let roadCount=0, doubleRoadCount=0, avenueCount=0;
       const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
       const inBounds = (r,c) => r>=0 && c>=0 && r<board.rows && c<board.cols;
@@ -230,7 +230,9 @@
             const rr = r+dr, cc = c+dc;
             if (inBounds(rr,cc) && roadTypes.includes(board.tiles[rr][cc])) connected.push([dr,dc]);
           }
+
           if (connected.length === 4) cross++;
+          else if (connected.length === 3) tshape++;
           else if (connected.length === 2) {
             const isCurve = (Math.abs(connected[0][0]) !== Math.abs(connected[1][0]));
             if (isCurve) {
@@ -242,12 +244,22 @@
           }
         }
       }
+
       document.getElementById('rightTurns').textContent = right;
       document.getElementById('leftTurns').textContent = left;
       document.getElementById('crossways').textContent = cross;
       document.getElementById('roadCount').textContent = roadCount;
       document.getElementById('doubleRoadCount').textContent = doubleRoadCount;
       document.getElementById('avenueCount').textContent = avenueCount;
+
+      // ✅ Add T-shape stat line dynamically if missing
+      let tLabel = document.getElementById('tshapeCount');
+      if (!tLabel) {
+        const container = document.getElementById('roadStats');
+        container.insertAdjacentHTML('beforeend','<br>T-Intersections: <span id="tshapeCount">0</span>');
+        tLabel = document.getElementById('tshapeCount');
+      }
+      tLabel.textContent = tshape;
     }
 
     const oldRenderBoards = renderBoards;
