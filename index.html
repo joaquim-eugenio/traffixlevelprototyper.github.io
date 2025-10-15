@@ -116,13 +116,14 @@
           <div style="margin-top:8px" class="small">You can also export a single level by selecting it and clicking the download icon next to it.</div>
         </div>
 
-        <!-- ✅ Updated Road Stats Section -->
+        <!-- ✅ Road Stats Section (now includes T-Intersections line) -->
         <div>
           <label>Road Statistics</label>
           <div class="small" id="roadStats">
             Right turns: <span id="rightTurns">0</span><br>
             Left turns: <span id="leftTurns">0</span><br>
             Crossways: <span id="crossways">0</span><br>
+            T-Intersections: <span id="tshapeCount">0</span><br>
             Roads: <span id="roadCount">0</span><br>
             Double Roads: <span id="doubleRoadCount">0</span><br>
             Avenues: <span id="avenueCount">0</span>
@@ -248,18 +249,10 @@
       document.getElementById('rightTurns').textContent = right;
       document.getElementById('leftTurns').textContent = left;
       document.getElementById('crossways').textContent = cross;
+      document.getElementById('tshapeCount').textContent = tshape;
       document.getElementById('roadCount').textContent = roadCount;
       document.getElementById('doubleRoadCount').textContent = doubleRoadCount;
       document.getElementById('avenueCount').textContent = avenueCount;
-
-      // ✅ Add T-shape stat line dynamically if missing
-      let tLabel = document.getElementById('tshapeCount');
-      if (!tLabel) {
-        const container = document.getElementById('roadStats');
-        container.insertAdjacentHTML('beforeend','<br>T-Intersections: <span id="tshapeCount">0</span>');
-        tLabel = document.getElementById('tshapeCount');
-      }
-      tLabel.textContent = tshape;
     }
 
     const oldRenderBoards = renderBoards;
