@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tile Board Editor — Local</title>
+  <title>Tile Board Editor — Weather + Counters</title>
   <style>
     :root{
       --cell-size:36px;
@@ -30,8 +30,8 @@
     .board-wrap{display:flex;flex-direction:column;gap:8px}
     .boards{display:flex;gap:10px;align-items:flex-start}
     .board{background:var(--ui-bg);padding:12px;border-radius:10px}
-    .grid{display:inline-grid;border-radius:6px;padding:4px;background:white}
-    .cell{width:var(--cell-size);height:var(--cell-size);display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:16px;cursor:pointer;user-select:none}
+    .grid{display:inline-grid;border-radius:6px;padding:4px;background:white;position:relative}
+    .cell{position:relative;width:var(--cell-size);height:var(--cell-size);display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:16px;cursor:pointer;user-select:none}
     .cell.empty{background:transparent}
     .palette-swatch{width:18px;height:18px;border-radius:4px;display:inline-block;vertical-align:middle}
     .controls-row{display:flex;gap:8px;flex-wrap:wrap}
@@ -40,20 +40,30 @@
     .small{font-size:12px;color:var(--muted)}
     footer{margin-top:12px;font-size:12px;color:var(--muted)}
 
-    /* existing tiles */
     .road{background:linear-gradient(180deg,#fff7ed,#fff1e6);border:1px solid #f6ad55}
     .prop{background:linear-gradient(180deg,#f0fdf4,#ecfdf3);border:1px solid #34d399}
     .landmark{background:linear-gradient(180deg,#eef2ff,#e8f0ff);border:1px solid #60a5fa}
     .block{background:linear-gradient(180deg,#fff1f2,#fff5f6);border:1px solid #f87171}
     .mandatory{background:linear-gradient(180deg,#fef9c3,#fef08a);border:1px solid #eab308}
     .empty{background:transparent;border:1px dashed rgba(15,23,42,0.06)}
-
-    /* ✅ new road variants */
     .doubleRoad{background:linear-gradient(180deg,#e0f2fe,#bae6fd);border:1px solid #38bdf8;}
     .avenue{background:linear-gradient(180deg,#dcfce7,#bbf7d0);border:1px solid #4ade80;}
-
-    /* 🌊 River tile (added) */
     .river{background:linear-gradient(180deg,#bfdbfe,#93c5fd);border:1px solid #3b82f6;}
+
+    /* ☁️ Weather tile */
+    .weather{background:linear-gradient(180deg,#e0f2fe,#dbeafe);border:1px solid #93c5fd;}
+    .weather-layer {
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:16px;
+      pointer-events:none;
+      transition:opacity 0.1s;
+    }
+    .weather-layer.opaque {opacity:1;}
+    .weather-layer.translucent {opacity:0.5;}
 
     @media (max-width:920px){.app{grid-template-columns:1fr;}}
   </style>
@@ -61,7 +71,7 @@
 <body>
   <div class="app">
     <div class="panel">
-      <h1>Tile Board Editor (local single-file)</h1>
+      <h1>Tile Board Editor (with Weather)</h1>
       <div class="controls">
 
         <div class="controls-row">
@@ -99,49 +109,36 @@
         </div>
 
         <div>
-          <label>Compare Levels</label>
-          <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
-            <select id="compareSelect1"></select>
-            <select id="compareSelect2"></select>
-            <button id="compareBtn" class="ghost">Show</button>
-            <button id="hideCompare" class="ghost" style="display:none">Hide</button>
-          </div>
-        </div>
-
-        <div>
           <label>Save / Load</label>
           <div style="display:flex;gap:8px;margin-top:6px">
             <button id="exportAll">Download JSON</button>
             <input id="importFile" type="file" accept="application/json" style="display:none">
             <button id="importBtn" class="ghost">Load JSON</button>
           </div>
-          <div style="margin-top:8px" class="small">You can also export a single level by selecting it and clicking the download icon next to it.</div>
         </div>
 
-        <!-- ✅ Road Stats Section -->
+        <!-- ✅ Road Stats -->
         <div>
           <label>Road Statistics</label>
           <div class="small" id="roadStats">
-            Right turns: <span id="rightTurns">0</span><br>
-            Left turns: <span id="leftTurns">0</span><br>
-            Crossways: <span id="crossways">0</span><br>
-            T-Intersections: <span id="tshapeCount">0</span><br>
             Roads: <span id="roadCount">0</span><br>
             Double Roads: <span id="doubleRoadCount">0</span><br>
-            Avenues: <span id="avenueCount">0</span>
+            Avenues: <span id="avenueCount">0</span><br>
+            Rivers: <span id="riverCount">0</span><br>
+            Props: <span id="propCount">0</span><br>
+            Landmarks: <span id="landmarkCount">0</span><br>
+            Blocks: <span id="blockCount">0</span><br>
+            Mandatory: <span id="mandatoryCount">0</span><br>
+            Weather: <span id="weatherCount">0</span>
           </div>
         </div>
 
-        <footer>
-          <div class="small">Open the file in your browser to run locally. Works offline.</div>
-        </footer>
+        <footer><div class="small">Supports weather overlays 🌤️</div></footer>
       </div>
     </div>
 
     <div class="panel board-wrap">
-      <div class="row-between">
-        <div class="small">Active Level: <span id="activeLabel">Level 1</span></div>
-      </div>
+      <div class="small">Active Level: <span id="activeLabel">Level 1</span></div>
       <div class="boards" id="boardsContainer"></div>
     </div>
   </div>
@@ -156,8 +153,8 @@
       {key:'landmark', label:'Landmark', emoji:'⛰️', class:'landmark'},
       {key:'block', label:'Blocking', emoji:'🚫', class:'block'},
       {key:'mandatory', label:'Mandatory', emoji:'⭐', class:'mandatory'},
-      /* 🌊 River tile (added) */
       {key:'river', label:'River', emoji:'🌊', class:'river'},
+      {key:'weather', label:'Weather', emoji:'🌤️', class:'weather'},
     ];
 
     let boards=[]; let activeIndex=0; let brush=null; let mode='cycle'; let isMouseDown=false;
@@ -175,14 +172,11 @@
     const importFile=document.getElementById('importFile');
     const modeCycle=document.getElementById('modeCycle');
     const modeBrush=document.getElementById('modeBrush');
-    const compareSelect1=document.getElementById('compareSelect1');
-    const compareSelect2=document.getElementById('compareSelect2');
-    const compareBtn=document.getElementById('compareBtn');
-    const hideCompare=document.getElementById('hideCompare');
     const activeLabel=document.getElementById('activeLabel');
 
     function makeEmptyTiles(cols,rows){return Array.from({length:rows},()=>Array(cols).fill('empty'))}
-    function createBoard(name,cols,rows){return{name,cols,rows,tiles:makeEmptyTiles(cols,rows)}}
+    function makeEmptyWeather(cols,rows){return Array.from({length:rows},()=>Array(cols).fill(null))}
+    function createBoard(name,cols,rows){return{name,cols,rows,tiles:makeEmptyTiles(cols,rows),weather:makeEmptyWeather(cols,rows)}}
 
     function setupTileTypes(){
       tileTypesEl.innerHTML='';
@@ -210,20 +204,30 @@
 
       for(let r=0;r<board.rows;r++){
         for(let c=0;c<board.cols;c++){
-          const t=board.tiles[r][c]||'empty';
+          const baseType=board.tiles[r][c]||'empty';
+          const weatherType=board.weather?.[r]?.[c]||null;
           const cell=document.createElement('div');
-          cell.className='cell '+t;
-          const typeDef=TILE_TYPES.find(x=>x.key===t);
-          cell.textContent=typeDef?.emoji||'';
-          
-          // ✅ Optimized: only re-render cell itself in brush mode
+          cell.className='cell '+baseType;
+          const baseDef=TILE_TYPES.find(x=>x.key===baseType);
+          cell.textContent=baseDef?.emoji||'';
+
+          if(weatherType){
+            const wDef=TILE_TYPES.find(x=>x.key==='weather');
+            const layer=document.createElement('div');
+            layer.className='weather-layer';
+            layer.textContent=wDef.emoji;
+            if(baseType==='empty')layer.classList.add('opaque');
+            else layer.classList.add('translucent');
+            cell.appendChild(layer);
+          }
+
           cell.addEventListener('mousedown',()=>{
             isMouseDown=true;
             if(mode==='cycle'){cycleCell(r,c);renderBoards();}
-            else if(mode==='brush'){applyBrush(r,c,cell);}
+            else if(mode==='brush'){applyBrush(r,c);}
           });
           cell.addEventListener('mouseenter',()=>{
-            if(isMouseDown&&mode==='brush'){applyBrush(r,c,cell);}
+            if(isMouseDown&&mode==='brush'){applyBrush(r,c);}
           });
           cell.addEventListener('mouseup',()=>{isMouseDown=false;});
           grid.appendChild(cell);
@@ -231,7 +235,7 @@
       }
       boardsContainer.appendChild(grid);
       renderLevelsList();
-      renderCompareSelects();
+      countTiles(board);
     }
 
     function renderLevelsList(){
@@ -240,36 +244,17 @@
         const item=document.createElement('div');
         item.className='level-item';
         const left=document.createElement('div');
-        left.style.display='flex';
-        left.style.flexDirection='column';
-        const name=document.createElement('div');
-        name.textContent=b.name||`Level ${i+1}`;
-        const meta=document.createElement('div');
-        meta.className='small';meta.textContent=`${b.cols}×${b.rows}`;
-        left.append(name,meta);
+        left.innerHTML=`<div>${b.name||`Level ${i+1}`}</div><div class='small'>${b.cols}×${b.rows}</div>`;
         const right=document.createElement('div');
         right.style.display='flex';right.style.gap='6px';
-        const openBtn=document.createElement('button');
-        openBtn.textContent='Open';openBtn.className='ghost';
+        const openBtn=document.createElement('button');openBtn.textContent='Open';openBtn.className='ghost';
         openBtn.addEventListener('click',()=>{activeIndex=i;renderBoards();});
-        const downloadBtn=document.createElement('button');
-        downloadBtn.textContent='⬇';downloadBtn.title='Download this level';
-        downloadBtn.addEventListener('click',()=>{downloadJSON({levels:[b]},`${b.name||'level-'+(i+1)}.json`);});
-        const del=document.createElement('button');
-        del.textContent='✖';del.className='ghost';
-        del.addEventListener('click',()=>{if(confirm('Delete level?')){boards.splice(i,1);if(activeIndex>=boards.length)activeIndex=boards.length-1;renderBoards();}});
-        right.append(openBtn,downloadBtn,del);item.append(left,right);levelsList.appendChild(item);
+        const dl=document.createElement('button');dl.textContent='⬇';
+        dl.addEventListener('click',()=>downloadJSON({levels:[b]},`${b.name||'level-'+(i+1)}.json`));
+        right.append(openBtn,dl);
+        item.append(left,right);
+        levelsList.appendChild(item);
       });
-    }
-
-    function renderCompareSelects(){
-      compareSelect1.innerHTML='';compareSelect2.innerHTML='';
-      boards.forEach((b,i)=>{
-        const o1=document.createElement('option');o1.value=i;o1.textContent=b.name||`Level ${i+1}`;
-        const o2=o1.cloneNode(true);
-        compareSelect1.appendChild(o1);compareSelect2.appendChild(o2);
-      });
-      compareSelect1.value=activeIndex;compareSelect2.value=Math.min(boards.length-1,activeIndex+1);
     }
 
     function cycleCell(r,c){
@@ -280,82 +265,94 @@
       b.tiles[r][c]=next;
     }
 
-    // ✅ Optimized brush: update only this cell visually
-    function applyBrush(r,c,cellEl){
+    function applyBrush(r,c){
       if(!brush)return;
       const b=boards[activeIndex];
-      b.tiles[r][c]=brush;
-      if(cellEl){
-        const typeDef=TILE_TYPES.find(x=>x.key===brush);
-        cellEl.className='cell '+brush;
-        cellEl.textContent=typeDef?.emoji||'';
+
+      if(brush==='empty'){
+        // clear both tile and weather if present
+        b.tiles[r][c]='empty';
+        b.weather[r][c]=null;
+      } else if(brush==='weather'){
+        b.weather[r][c]='weather';
+      } else {
+        b.tiles[r][c]=brush;
       }
-      countRoadStats(b);
+      renderBoards();
     }
 
-    newBoardBtn.addEventListener('click',()=>{const cols=Math.max(3,Math.min(60,+colsIn.value||23));const rows=Math.max(3,Math.min(60,+rowsIn.value||15));const idx=boards.push(createBoard(`Level ${boards.length+1}`,cols,rows))-1;activeIndex=idx;renderBoards();});
-    duplicateBtn.addEventListener('click',()=>{const src=boards[activeIndex];const copy=JSON.parse(JSON.stringify(src));copy.name=src.name+' (copy)';boards.push(copy);activeIndex=boards.length-1;renderBoards();});
-    clearBtn.addEventListener('click',()=>{if(!confirm('Clear current level?'))return;const b=boards[activeIndex];b.tiles=makeEmptyTiles(b.cols,b.rows);renderBoards();});
+    function countTiles(board){
+      const counts={
+        road:0,doubleRoad:0,avenue:0,river:0,prop:0,landmark:0,
+        block:0,mandatory:0,weather:0
+      };
+      for(let r=0;r<board.rows;r++){
+        for(let c=0;c<board.cols;c++){
+          const t=board.tiles[r][c];
+          if(counts.hasOwnProperty(t))counts[t]++;
+          if(board.weather[r][c]==='weather')counts.weather++;
+        }
+      }
+      for(const k in counts){
+        const el=document.getElementById(k+'Count');
+        if(el)el.textContent=counts[k];
+      }
+    }
 
-    function downloadJSON(obj,filename='levels.json'){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);}
+    newBoardBtn.addEventListener('click',()=>{
+      const cols=Math.max(3,Math.min(60,+colsIn.value||23));
+      const rows=Math.max(3,Math.min(60,+rowsIn.value||15));
+      const idx=boards.push(createBoard(`Level ${boards.length+1}`,cols,rows))-1;
+      activeIndex=idx;renderBoards();
+    });
+    duplicateBtn.addEventListener('click',()=>{
+      const src=boards[activeIndex];
+      const copy=JSON.parse(JSON.stringify(src));
+      copy.name=src.name+' (copy)';
+      boards.push(copy);activeIndex=boards.length-1;renderBoards();
+    });
+    clearBtn.addEventListener('click',()=>{
+      if(!confirm('Clear current level?'))return;
+      const b=boards[activeIndex];
+      b.tiles=makeEmptyTiles(b.cols,b.rows);
+      b.weather=makeEmptyWeather(b.cols,b.rows);
+      renderBoards();
+    });
 
-    exportAllBtn.addEventListener('click',()=>{downloadJSON({levels:boards},'tile-levels.json');});
+    function downloadJSON(obj,filename='levels.json'){
+      const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=filename;
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+    }
 
+    exportAllBtn.addEventListener('click',()=>downloadJSON({levels:boards},'tile-levels.json'));
     importBtn.addEventListener('click',()=>importFile.click());
-    importFile.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(reader.result);if(data.levels&&Array.isArray(data.levels)){data.levels.forEach(l=>{if(l.cols&&l.rows&&Array.isArray(l.tiles))boards.push(l);});activeIndex=Math.max(0,boards.length-1);setupTileTypes();renderBoards();alert('Loaded '+data.levels.length+' levels');}else alert('JSON must contain { levels: [...] }');}catch(err){alert('Invalid JSON file');}};reader.readAsText(f);});
-
-    compareBtn.addEventListener('click',()=>{const i1=+compareSelect1.value;const i2=+compareSelect2.value;if(i1===i2){alert('Pick two different levels to compare');return;}window._compareShown=true;window._compareIndex2=i2;activeIndex=i1;hideCompare.style.display='inline-block';renderBoards();});
-    hideCompare.addEventListener('click',()=>{window._compareShown=false;hideCompare.style.display='none';renderBoards();});
+    importFile.addEventListener('change',e=>{
+      const f=e.target.files[0];if(!f)return;
+      const reader=new FileReader();
+      reader.onload=()=>{
+        try{
+          const data=JSON.parse(reader.result);
+          if(data.levels&&Array.isArray(data.levels)){
+            data.levels.forEach(l=>{
+              if(l.cols&&l.rows&&Array.isArray(l.tiles)){
+                if(!l.weather)l.weather=makeEmptyWeather(l.cols,l.rows);
+                boards.push(l);
+              }
+            });
+            activeIndex=Math.max(0,boards.length-1);
+            setupTileTypes();renderBoards();
+            alert('Loaded '+data.levels.length+' levels');
+          }else alert('Invalid JSON');
+        }catch(err){alert('Invalid JSON');}
+      };
+      reader.readAsText(f);
+    });
 
     modeCycle.addEventListener('click',()=>{mode='cycle';modeCycle.classList.add('active');modeBrush.classList.remove('active');brush=null;document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));});
     modeBrush.addEventListener('click',()=>{mode='brush';modeBrush.classList.add('active');modeCycle.classList.remove('active');});
-
-    /* ✅ Includes T-shape detection (unchanged) */
-    function countRoadStats(board){
-      let right=0,left=0,cross=0,tshape=0;
-      let roadCount=0,doubleRoadCount=0,avenueCount=0;
-      const dirs=[[-1,0],[1,0],[0,-1],[0,1]];
-      const inBounds=(r,c)=>r>=0&&c>=0&&r<board.rows&&c<board.cols;
-      const roadTypes=['road','doubleRoad','avenue'];
-      for(let r=0;r<board.rows;r++){
-        for(let c=0;c<board.cols;c++){
-          const tile=board.tiles[r][c];
-          if(!roadTypes.includes(tile))continue;
-          if(tile==='road')roadCount++;
-          else if(tile==='doubleRoad')doubleRoadCount++;
-          else if(tile==='avenue')avenueCount++;
-          let connected=[];
-          for(const [dr,dc]of dirs){
-            const rr=r+dr,cc=c+dc;
-            if(inBounds(rr,cc)&&roadTypes.includes(board.tiles[rr][cc]))connected.push([dr,dc]);
-          }
-          if(connected.length===4)cross++;
-          else if(connected.length===3)tshape++;
-          else if(connected.length===2){
-            const isCurve=(Math.abs(connected[0][0])!==Math.abs(connected[1][0]));
-            if(isCurve){
-              const[d1,d2]=connected;
-              const dir=d1[0]*d2[1]-d1[1]*d2[0];
-              if(dir>0)right++;else if(dir<0)left++;
-            }
-          }
-        }
-      }
-      document.getElementById('rightTurns').textContent=right;
-      document.getElementById('leftTurns').textContent=left;
-      document.getElementById('crossways').textContent=cross;
-      document.getElementById('tshapeCount').textContent=tshape;
-      document.getElementById('roadCount').textContent=roadCount;
-      document.getElementById('doubleRoadCount').textContent=doubleRoadCount;
-      document.getElementById('avenueCount').textContent=avenueCount;
-    }
-
-    const oldRenderBoards=renderBoards;
-    renderBoards=function(){
-      oldRenderBoards();
-      const board=boards[activeIndex];
-      if(board)countRoadStats(board);
-    };
 
     function init(){setupTileTypes();boards=[createBoard('Level 1',+colsIn.value,+rowsIn.value)];activeIndex=0;renderBoards();}
     init();
