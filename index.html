@@ -51,16 +51,10 @@
     .avenue{background:linear-gradient(180deg,#dcfce7,#bbf7d0);border:1px solid #4ade80;}
     .river{background:linear-gradient(180deg,#bfdbfe,#93c5fd);border:1px solid #3b82f6;}
 
-    /* ☁️ Weather overlay tile */
-    .weather-overlay {
-      position:absolute;
-      top:0; left:0; right:0; bottom:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:18px;
-      pointer-events:none;
-    }
+    /* ☁️ Weather tile (special) */
+    .weather{background:transparent;border:1px dashed rgba(0,0,0,0.1);}
+    .weather.opaque{opacity:1;}
+    .weather.semi{opacity:0.6;}
 
     @media (max-width:920px){.app{grid-template-columns:1fr;}}
   </style>
@@ -122,26 +116,18 @@
             <input id="importFile" type="file" accept="application/json" style="display:none">
             <button id="importBtn" class="ghost">Load JSON</button>
           </div>
-          <div style="margin-top:8px" class="small">You can also export a single level by selecting it and clicking the download icon next to it.</div>
         </div>
 
         <div>
-          <label>Road Statistics</label>
+          <label>Statistics</label>
           <div class="small" id="roadStats">
-            Right turns: <span id="rightTurns">0</span><br>
-            Left turns: <span id="leftTurns">0</span><br>
-            Crossways: <span id="crossways">0</span><br>
-            T-Intersections: <span id="tshapeCount">0</span><br>
             Roads: <span id="roadCount">0</span><br>
             Double Roads: <span id="doubleRoadCount">0</span><br>
             Avenues: <span id="avenueCount">0</span><br>
-            Weather tiles: <span id="weatherCount">0</span>
+            Weather: <span id="weatherCount">0</span>
           </div>
         </div>
 
-        <footer>
-          <div class="small">Open the file in your browser to run locally. Works offline.</div>
-        </footer>
       </div>
     </div>
 
@@ -173,7 +159,6 @@
     const rowsIn=document.getElementById('rows');
     const tileTypesEl=document.getElementById('tileTypes');
     const boardsContainer=document.getElementById('boardsContainer');
-    const levelsList=document.getElementById('levelsList');
     const newBoardBtn=document.getElementById('newBoard');
     const duplicateBtn=document.getElementById('duplicate');
     const clearBtn=document.getElementById('clear');
@@ -182,14 +167,10 @@
     const importFile=document.getElementById('importFile');
     const modeCycle=document.getElementById('modeCycle');
     const modeBrush=document.getElementById('modeBrush');
-    const compareSelect1=document.getElementById('compareSelect1');
-    const compareSelect2=document.getElementById('compareSelect2');
-    const compareBtn=document.getElementById('compareBtn');
-    const hideCompare=document.getElementById('hideCompare');
     const activeLabel=document.getElementById('activeLabel');
 
     function makeEmptyTiles(cols,rows){return Array.from({length:rows},()=>Array(cols).fill('empty'))}
-    function createBoard(name,cols,rows){return{name,cols,rows,tiles:makeEmptyTiles(cols,rows),weather:makeEmptyTiles(cols,rows)}}
+    function createBoard(name,cols,rows){return{name,cols,rows,tiles:makeEmptyTiles(cols,rows)}}
 
     function setupTileTypes(){
       tileTypesEl.innerHTML='';
@@ -210,7 +191,7 @@
       boardsContainer.innerHTML='';
       const board=boards[activeIndex];
       if(!board)return;
-      activeLabel.textContent=board.name||`Level ${activeIndex+1}`;
+      activeLabel.textContent=board.name;
       const grid=document.createElement('div');
       grid.className='grid';
       grid.style.gridTemplateColumns=`repeat(${board.cols}, var(--cell-size))`;
@@ -219,69 +200,22 @@
         for(let c=0;c<board.cols;c++){
           const t=board.tiles[r][c]||'empty';
           const cell=document.createElement('div');
-          cell.className='cell '+t;
-          cell.style.position='relative';
           const typeDef=TILE_TYPES.find(x=>x.key===t);
+          cell.className='cell '+t;
           cell.textContent=typeDef?.emoji||'';
-          if(board.weather && board.weather[r][c]==='weather'){
-            const overlay=document.createElement('div');
-            overlay.className='weather-overlay';
-            overlay.textContent='🌦️';
-            cell.appendChild(overlay);
+          if(t==='weather'){
+            const below=board._underlay?.[r]?.[c];
+            if(below && below!=='empty') cell.classList.add('semi');
+            else cell.classList.add('opaque');
           }
-          cell.addEventListener('mousedown',()=>{
-            isMouseDown=true;
-            if(mode==='cycle'){cycleCell(r,c);renderBoards();}
-            else if(mode==='brush'){applyBrush(r,c,cell);}
-          });
-          cell.addEventListener('mouseenter',()=>{
-            if(isMouseDown&&mode==='brush'){applyBrush(r,c,cell);}
-          });
+          cell.addEventListener('mousedown',()=>{isMouseDown=true;if(mode==='cycle'){cycleCell(r,c);renderBoards();}else if(mode==='brush'){applyBrush(r,c,cell);}});
+          cell.addEventListener('mouseenter',()=>{if(isMouseDown&&mode==='brush'){applyBrush(r,c,cell);}});
           cell.addEventListener('mouseup',()=>{isMouseDown=false;});
           grid.appendChild(cell);
         }
       }
       boardsContainer.appendChild(grid);
-      renderLevelsList();
-      renderCompareSelects();
-    }
-
-    function renderLevelsList(){
-      levelsList.innerHTML='';
-      boards.forEach((b,i)=>{
-        const item=document.createElement('div');
-        item.className='level-item';
-        const left=document.createElement('div');
-        left.style.display='flex';
-        left.style.flexDirection='column';
-        const name=document.createElement('div');
-        name.textContent=b.name||`Level ${i+1}`;
-        const meta=document.createElement('div');
-        meta.className='small';meta.textContent=`${b.cols}×${b.rows}`;
-        left.append(name,meta);
-        const right=document.createElement('div');
-        right.style.display='flex';right.style.gap='6px';
-        const openBtn=document.createElement('button');
-        openBtn.textContent='Open';openBtn.className='ghost';
-        openBtn.addEventListener('click',()=>{activeIndex=i;renderBoards();});
-        const downloadBtn=document.createElement('button');
-        downloadBtn.textContent='⬇';downloadBtn.title='Download this level';
-        downloadBtn.addEventListener('click',()=>{downloadJSON({levels:[b]},`${b.name||'level-'+(i+1)}.json`);});
-        const del=document.createElement('button');
-        del.textContent='✖';del.className='ghost';
-        del.addEventListener('click',()=>{if(confirm('Delete level?')){boards.splice(i,1);if(activeIndex>=boards.length)activeIndex=boards.length-1;renderBoards();}});
-        right.append(openBtn,downloadBtn,del);item.append(left,right);levelsList.appendChild(item);
-      });
-    }
-
-    function renderCompareSelects(){
-      compareSelect1.innerHTML='';compareSelect2.innerHTML='';
-      boards.forEach((b,i)=>{
-        const o1=document.createElement('option');o1.value=i;o1.textContent=b.name||`Level ${i+1}`;
-        const o2=o1.cloneNode(true);
-        compareSelect1.appendChild(o1);compareSelect2.appendChild(o2);
-      });
-      compareSelect1.value=activeIndex;compareSelect2.value=Math.min(boards.length-1,activeIndex+1);
+      countStats(board);
     }
 
     function cycleCell(r,c){
@@ -292,96 +226,42 @@
       b.tiles[r][c]=next;
     }
 
-    function applyBrush(r,c,cellEl){
+    function applyBrush(r,c,cell){
       if(!brush)return;
       const b=boards[activeIndex];
+      const prev=b.tiles[r][c];
       if(brush==='weather'){
-        b.weather[r][c]=b.weather[r][c] ? null : 'weather'; // toggle
-      } else {
-        b.tiles[r][c]=brush;
+        b._underlay=b._underlay||makeEmptyTiles(b.cols,b.rows);
+        b._underlay[r][c]=prev;
       }
-      if(cellEl){
-        const baseType=TILE_TYPES.find(x=>x.key===b.tiles[r][c]);
-        cellEl.className='cell '+b.tiles[r][c];
-        cellEl.textContent=baseType?.emoji||'';
-        cellEl.style.position='relative';
-        cellEl.querySelector('.weather-overlay')?.remove();
-        if(b.weather[r][c]){
-          const overlay=document.createElement('div');
-          overlay.className='weather-overlay';
-          overlay.textContent='🌦️';
-          cellEl.appendChild(overlay);
-        }
-      }
-      countRoadStats(b);
+      b.tiles[r][c]=brush;
+      renderBoards();
     }
 
-    newBoardBtn.addEventListener('click',()=>{const cols=Math.max(3,Math.min(60,+colsIn.value||23));const rows=Math.max(3,Math.min(60,+rowsIn.value||15));const idx=boards.push(createBoard(`Level ${boards.length+1}`,cols,rows))-1;activeIndex=idx;renderBoards();});
+    newBoardBtn.addEventListener('click',()=>{const cols=+colsIn.value||23;const rows=+rowsIn.value||15;boards.push(createBoard(`Level ${boards.length+1}`,cols,rows));activeIndex=boards.length-1;renderBoards();});
     duplicateBtn.addEventListener('click',()=>{const src=boards[activeIndex];const copy=JSON.parse(JSON.stringify(src));copy.name=src.name+' (copy)';boards.push(copy);activeIndex=boards.length-1;renderBoards();});
-    clearBtn.addEventListener('click',()=>{if(!confirm('Clear current level?'))return;const b=boards[activeIndex];b.tiles=makeEmptyTiles(b.cols,b.rows);b.weather=makeEmptyTiles(b.cols,b.rows);renderBoards();});
+    clearBtn.addEventListener('click',()=>{if(confirm('Clear current level?')){boards[activeIndex].tiles=makeEmptyTiles(boards[activeIndex].cols,boards[activeIndex].rows);renderBoards();}});
 
-    function downloadJSON(obj,filename='levels.json'){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);}
-
-    exportAllBtn.addEventListener('click',()=>{downloadJSON({levels:boards},'tile-levels.json');});
-
-    importBtn.addEventListener('click',()=>importFile.click());
-    importFile.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(reader.result);if(data.levels&&Array.isArray(data.levels)){data.levels.forEach(l=>{if(l.cols&&l.rows&&Array.isArray(l.tiles))boards.push(l);});activeIndex=Math.max(0,boards.length-1);setupTileTypes();renderBoards();alert('Loaded '+data.levels.length+' levels');}else alert('JSON must contain { levels: [...] }');}catch(err){alert('Invalid JSON file');}};reader.readAsText(f);});
-
-    compareBtn.addEventListener('click',()=>{const i1=+compareSelect1.value;const i2=+compareSelect2.value;if(i1===i2){alert('Pick two different levels to compare');return;}window._compareShown=true;window._compareIndex2=i2;activeIndex=i1;hideCompare.style.display='inline-block';renderBoards();});
-    hideCompare.addEventListener('click',()=>{window._compareShown=false;hideCompare.style.display='none';renderBoards();});
+    function countStats(board){
+      let road=0,doubleRoad=0,avenue=0,weather=0;
+      for(const row of board.tiles){
+        for(const t of row){
+          if(t==='road')road++;
+          if(t==='doubleRoad')doubleRoad++;
+          if(t==='avenue')avenue++;
+          if(t==='weather')weather++;
+        }
+      }
+      document.getElementById('roadCount').textContent=road;
+      document.getElementById('doubleRoadCount').textContent=doubleRoad;
+      document.getElementById('avenueCount').textContent=avenue;
+      document.getElementById('weatherCount').textContent=weather;
+    }
 
     modeCycle.addEventListener('click',()=>{mode='cycle';modeCycle.classList.add('active');modeBrush.classList.remove('active');brush=null;document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));});
     modeBrush.addEventListener('click',()=>{mode='brush';modeBrush.classList.add('active');modeCycle.classList.remove('active');});
 
-    function countRoadStats(board){
-      let right=0,left=0,cross=0,tshape=0;
-      let roadCount=0,doubleRoadCount=0,avenueCount=0,weatherCount=0;
-      const dirs=[[-1,0],[1,0],[0,-1],[0,1]];
-      const inBounds=(r,c)=>r>=0&&c>=0&&r<board.rows&&c<board.cols;
-      const roadTypes=['road','doubleRoad','avenue'];
-      for(let r=0;r<board.rows;r++){
-        for(let c=0;c<board.cols;c++){
-          const tile=board.tiles[r][c];
-          if(board.weather && board.weather[r][c]==='weather') weatherCount++;
-          if(!roadTypes.includes(tile))continue;
-          if(tile==='road')roadCount++;
-          else if(tile==='doubleRoad')doubleRoadCount++;
-          else if(tile==='avenue')avenueCount++;
-          let connected=[];
-          for(const [dr,dc]of dirs){
-            const rr=r+dr,cc=c+dc;
-            if(inBounds(rr,cc)&&roadTypes.includes(board.tiles[rr][cc]))connected.push([dr,dc]);
-          }
-          if(connected.length===4)cross++;
-          else if(connected.length===3)tshape++;
-          else if(connected.length===2){
-            const isCurve=(Math.abs(connected[0][0])!==Math.abs(connected[1][0]));
-            if(isCurve){
-              const[d1,d2]=connected;
-              const dir=d1[0]*d2[1]-d1[1]*d2[0];
-              if(dir>0)right++;else if(dir<0)left++;
-            }
-          }
-        }
-      }
-      document.getElementById('rightTurns').textContent=right;
-      document.getElementById('leftTurns').textContent=left;
-      document.getElementById('crossways').textContent=cross;
-      document.getElementById('tshapeCount').textContent=tshape;
-      document.getElementById('roadCount').textContent=roadCount;
-      document.getElementById('doubleRoadCount').textContent=doubleRoadCount;
-      document.getElementById('avenueCount').textContent=avenueCount;
-      document.getElementById('weatherCount').textContent=weatherCount;
-    }
-
-    const oldRenderBoards=renderBoards;
-    renderBoards=function(){
-      oldRenderBoards();
-      const board=boards[activeIndex];
-      if(board)countRoadStats(board);
-    };
-
-    function init(){setupTileTypes();boards=[createBoard('Level 1',+colsIn.value,+rowsIn.value)];activeIndex=0;renderBoards();}
+    function init(){setupTileTypes();boards=[createBoard('Level 1',+colsIn.value,+rowsIn.value)];renderBoards();}
     init();
   </script>
 </body>
