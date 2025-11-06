@@ -47,13 +47,20 @@
     .block{background:linear-gradient(180deg,#fff1f2,#fff5f6);border:1px solid #f87171}
     .mandatory{background:linear-gradient(180deg,#fef9c3,#fef08a);border:1px solid #eab308}
     .empty{background:transparent;border:1px dashed rgba(15,23,42,0.06)}
-
-    /* ✅ new road variants */
     .doubleRoad{background:linear-gradient(180deg,#e0f2fe,#bae6fd);border:1px solid #38bdf8;}
     .avenue{background:linear-gradient(180deg,#dcfce7,#bbf7d0);border:1px solid #4ade80;}
-
-    /* 🌊 River tile (added) */
     .river{background:linear-gradient(180deg,#bfdbfe,#93c5fd);border:1px solid #3b82f6;}
+
+    /* ☁️ Weather overlay tile */
+    .weather-overlay {
+      position:absolute;
+      top:0; left:0; right:0; bottom:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:18px;
+      pointer-events:none;
+    }
 
     @media (max-width:920px){.app{grid-template-columns:1fr;}}
   </style>
@@ -118,7 +125,6 @@
           <div style="margin-top:8px" class="small">You can also export a single level by selecting it and clicking the download icon next to it.</div>
         </div>
 
-        <!-- ✅ Road Stats Section -->
         <div>
           <label>Road Statistics</label>
           <div class="small" id="roadStats">
@@ -128,7 +134,8 @@
             T-Intersections: <span id="tshapeCount">0</span><br>
             Roads: <span id="roadCount">0</span><br>
             Double Roads: <span id="doubleRoadCount">0</span><br>
-            Avenues: <span id="avenueCount">0</span>
+            Avenues: <span id="avenueCount">0</span><br>
+            Weather tiles: <span id="weatherCount">0</span>
           </div>
         </div>
 
@@ -156,8 +163,8 @@
       {key:'landmark', label:'Landmark', emoji:'⛰️', class:'landmark'},
       {key:'block', label:'Blocking', emoji:'🚫', class:'block'},
       {key:'mandatory', label:'Mandatory', emoji:'⭐', class:'mandatory'},
-      /* 🌊 River tile (added) */
       {key:'river', label:'River', emoji:'🌊', class:'river'},
+      {key:'weather', label:'Weather', emoji:'🌦️', class:'weather'},
     ];
 
     let boards=[]; let activeIndex=0; let brush=null; let mode='cycle'; let isMouseDown=false;
@@ -182,7 +189,7 @@
     const activeLabel=document.getElementById('activeLabel');
 
     function makeEmptyTiles(cols,rows){return Array.from({length:rows},()=>Array(cols).fill('empty'))}
-    function createBoard(name,cols,rows){return{name,cols,rows,tiles:makeEmptyTiles(cols,rows)}}
+    function createBoard(name,cols,rows){return{name,cols,rows,tiles:makeEmptyTiles(cols,rows),weather:makeEmptyTiles(cols,rows)}}
 
     function setupTileTypes(){
       tileTypesEl.innerHTML='';
@@ -213,10 +220,15 @@
           const t=board.tiles[r][c]||'empty';
           const cell=document.createElement('div');
           cell.className='cell '+t;
+          cell.style.position='relative';
           const typeDef=TILE_TYPES.find(x=>x.key===t);
           cell.textContent=typeDef?.emoji||'';
-          
-          // ✅ Optimized: only re-render cell itself in brush mode
+          if(board.weather && board.weather[r][c]==='weather'){
+            const overlay=document.createElement('div');
+            overlay.className='weather-overlay';
+            overlay.textContent='🌦️';
+            cell.appendChild(overlay);
+          }
           cell.addEventListener('mousedown',()=>{
             isMouseDown=true;
             if(mode==='cycle'){cycleCell(r,c);renderBoards();}
@@ -280,22 +292,33 @@
       b.tiles[r][c]=next;
     }
 
-    // ✅ Optimized brush: update only this cell visually
     function applyBrush(r,c,cellEl){
       if(!brush)return;
       const b=boards[activeIndex];
-      b.tiles[r][c]=brush;
+      if(brush==='weather'){
+        b.weather[r][c]=b.weather[r][c] ? null : 'weather'; // toggle
+      } else {
+        b.tiles[r][c]=brush;
+      }
       if(cellEl){
-        const typeDef=TILE_TYPES.find(x=>x.key===brush);
-        cellEl.className='cell '+brush;
-        cellEl.textContent=typeDef?.emoji||'';
+        const baseType=TILE_TYPES.find(x=>x.key===b.tiles[r][c]);
+        cellEl.className='cell '+b.tiles[r][c];
+        cellEl.textContent=baseType?.emoji||'';
+        cellEl.style.position='relative';
+        cellEl.querySelector('.weather-overlay')?.remove();
+        if(b.weather[r][c]){
+          const overlay=document.createElement('div');
+          overlay.className='weather-overlay';
+          overlay.textContent='🌦️';
+          cellEl.appendChild(overlay);
+        }
       }
       countRoadStats(b);
     }
 
     newBoardBtn.addEventListener('click',()=>{const cols=Math.max(3,Math.min(60,+colsIn.value||23));const rows=Math.max(3,Math.min(60,+rowsIn.value||15));const idx=boards.push(createBoard(`Level ${boards.length+1}`,cols,rows))-1;activeIndex=idx;renderBoards();});
     duplicateBtn.addEventListener('click',()=>{const src=boards[activeIndex];const copy=JSON.parse(JSON.stringify(src));copy.name=src.name+' (copy)';boards.push(copy);activeIndex=boards.length-1;renderBoards();});
-    clearBtn.addEventListener('click',()=>{if(!confirm('Clear current level?'))return;const b=boards[activeIndex];b.tiles=makeEmptyTiles(b.cols,b.rows);renderBoards();});
+    clearBtn.addEventListener('click',()=>{if(!confirm('Clear current level?'))return;const b=boards[activeIndex];b.tiles=makeEmptyTiles(b.cols,b.rows);b.weather=makeEmptyTiles(b.cols,b.rows);renderBoards();});
 
     function downloadJSON(obj,filename='levels.json'){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);}
 
@@ -310,16 +333,16 @@
     modeCycle.addEventListener('click',()=>{mode='cycle';modeCycle.classList.add('active');modeBrush.classList.remove('active');brush=null;document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));});
     modeBrush.addEventListener('click',()=>{mode='brush';modeBrush.classList.add('active');modeCycle.classList.remove('active');});
 
-    /* ✅ Includes T-shape detection (unchanged) */
     function countRoadStats(board){
       let right=0,left=0,cross=0,tshape=0;
-      let roadCount=0,doubleRoadCount=0,avenueCount=0;
+      let roadCount=0,doubleRoadCount=0,avenueCount=0,weatherCount=0;
       const dirs=[[-1,0],[1,0],[0,-1],[0,1]];
       const inBounds=(r,c)=>r>=0&&c>=0&&r<board.rows&&c<board.cols;
       const roadTypes=['road','doubleRoad','avenue'];
       for(let r=0;r<board.rows;r++){
         for(let c=0;c<board.cols;c++){
           const tile=board.tiles[r][c];
+          if(board.weather && board.weather[r][c]==='weather') weatherCount++;
           if(!roadTypes.includes(tile))continue;
           if(tile==='road')roadCount++;
           else if(tile==='doubleRoad')doubleRoadCount++;
@@ -348,6 +371,7 @@
       document.getElementById('roadCount').textContent=roadCount;
       document.getElementById('doubleRoadCount').textContent=doubleRoadCount;
       document.getElementById('avenueCount').textContent=avenueCount;
+      document.getElementById('weatherCount').textContent=weatherCount;
     }
 
     const oldRenderBoards=renderBoards;
