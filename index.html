@@ -145,7 +145,11 @@
       {key:'weather', label:'Weather', emoji:'🌦️', class:'weather'}
     ];
 
-    let boards=[]; let activeIndex=0; let brush=null; let mode='cycle'; let isMouseDown=false;
+    let boards=[]; 
+    let activeIndex=0; 
+    let brush=null; 
+    let mode='cycle'; 
+    let isMouseDown=false;
 
     const tileTypesEl=document.getElementById('tileTypes');
     const boardsContainer=document.getElementById('boardsContainer');
@@ -188,13 +192,11 @@
           const cell=document.createElement('div');
           cell.className='cell '+base;
 
-          // Base emoji
           const baseDef=TILE_TYPES.find(x=>x.key===base);
           const baseEmoji=document.createElement('div');
           baseEmoji.textContent=baseDef?.emoji||'';
           cell.appendChild(baseEmoji);
 
-          // Weather overlay if exists
           if(weather==='weather'){
             const overlay=document.createElement('div');
             overlay.className='weather-emoji '+(base!=='empty'?'weather-semi':'weather-opaque');
@@ -202,7 +204,7 @@
             cell.appendChild(overlay);
           }
 
-          // Interactions
+          // draw & drag support
           cell.addEventListener('mousedown',()=>{
             isMouseDown=true;
             if(mode==='cycle'){cycleCell(r,c);renderBoards();}
@@ -211,7 +213,7 @@
           cell.addEventListener('mouseenter',()=>{
             if(isMouseDown&&mode==='brush'){applyBrush(r,c);}
           });
-          cell.addEventListener('mouseup',()=>isMouseDown=false);
+          cell.addEventListener('mouseup',()=>{isMouseDown=false;});
 
           grid.appendChild(cell);
         }
@@ -220,6 +222,8 @@
       boardsContainer.appendChild(grid);
       countStats(board);
     }
+
+    document.body.addEventListener('mouseup',()=>isMouseDown=false);
 
     function cycleCell(r,c){
       const b=boards[activeIndex];
@@ -235,7 +239,7 @@
         b.tiles[r][c]='empty';
         b.weather[r][c]='empty';
       } else if(brush==='weather'){
-        b.weather[r][c]=b.weather[r][c]==='weather'?'empty':'weather';
+        b.weather[r][c]='weather';
       } else {
         b.tiles[r][c]=brush;
       }
@@ -266,6 +270,7 @@
       brush=null;
       document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));
     });
+
     document.getElementById('modeBrush').addEventListener('click',()=>{
       mode='brush';
       document.getElementById('modeBrush').classList.add('active');
