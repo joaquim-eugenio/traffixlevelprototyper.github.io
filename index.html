@@ -12,10 +12,10 @@
       --panel-bg:#ffffff;
       --accent:#2563eb;
       --muted:#6b7280;
-      --shadow: 0 4px 14px rgba(16,24,40,0.06);
+      --shadow:0 4px 14px rgba(16,24,40,0.06);
     }
     *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Arial,sans-serif}
-    body{margin:16px;background:linear-gradient(180deg,#f8fafc, #eef2ff);color:#0f172a}
+    body{margin:16px;background:linear-gradient(180deg,#f8fafc,#eef2ff);color:#0f172a}
     h1{font-size:18px;margin:0 0 8px}
     .app{display:grid;grid-template-columns:360px 1fr;gap:16px}
     .panel{background:var(--panel-bg);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
@@ -31,8 +31,19 @@
     .boards{display:flex;gap:10px;align-items:flex-start}
     .board{background:var(--ui-bg);padding:12px;border-radius:10px}
     .grid{display:inline-grid;border-radius:6px;padding:4px;background:white}
-    .cell{width:var(--cell-size);height:var(--cell-size);display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:16px;cursor:pointer;user-select:none}
-    .cell.empty{background:transparent}
+    .cell{
+      width:var(--cell-size);
+      height:var(--cell-size);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:4px;
+      font-size:18px;
+      cursor:pointer;
+      user-select:none;
+      position:relative;
+    }
+    .cell.empty{background:transparent;border:1px dashed rgba(15,23,42,0.06)}
     .palette-swatch{width:18px;height:18px;border-radius:4px;display:inline-block;vertical-align:middle}
     .controls-row{display:flex;gap:8px;flex-wrap:wrap}
     .levels-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto}
@@ -40,21 +51,29 @@
     .small{font-size:12px;color:var(--muted)}
     footer{margin-top:12px;font-size:12px;color:var(--muted)}
 
-    /* existing tiles */
+    /* tile styles */
     .road{background:linear-gradient(180deg,#fff7ed,#fff1e6);border:1px solid #f6ad55}
     .prop{background:linear-gradient(180deg,#f0fdf4,#ecfdf3);border:1px solid #34d399}
     .landmark{background:linear-gradient(180deg,#eef2ff,#e8f0ff);border:1px solid #60a5fa}
     .block{background:linear-gradient(180deg,#fff1f2,#fff5f6);border:1px solid #f87171}
     .mandatory{background:linear-gradient(180deg,#fef9c3,#fef08a);border:1px solid #eab308}
-    .empty{background:transparent;border:1px dashed rgba(15,23,42,0.06)}
     .doubleRoad{background:linear-gradient(180deg,#e0f2fe,#bae6fd);border:1px solid #38bdf8;}
     .avenue{background:linear-gradient(180deg,#dcfce7,#bbf7d0);border:1px solid #4ade80;}
     .river{background:linear-gradient(180deg,#bfdbfe,#93c5fd);border:1px solid #3b82f6;}
+    .empty{background:transparent;border:1px dashed rgba(15,23,42,0.06)}
 
-    /* ☁️ Weather tile (special) */
-    .weather{background:transparent;border:1px dashed rgba(0,0,0,0.1);}
-    .weather.opaque{opacity:1;}
-    .weather.semi{opacity:0.6;}
+    /* weather overlay */
+    .weather-emoji {
+      position:absolute;
+      top:0;left:0;right:0;bottom:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+      font-size:18px;
+    }
+    .weather-opaque{opacity:1;}
+    .weather-semi{opacity:0.6;}
 
     @media (max-width:920px){.app{grid-template-columns:1fr;}}
   </style>
@@ -62,7 +81,7 @@
 <body>
   <div class="app">
     <div class="panel">
-      <h1>Tile Board Editor (local single-file)</h1>
+      <h1>Tile Board Editor (local)</h1>
       <div class="controls">
 
         <div class="controls-row">
@@ -95,46 +114,19 @@
         </div>
 
         <div>
-          <label>Levels</label>
-          <div class="levels-list" id="levelsList"></div>
-        </div>
-
-        <div>
-          <label>Compare Levels</label>
-          <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
-            <select id="compareSelect1"></select>
-            <select id="compareSelect2"></select>
-            <button id="compareBtn" class="ghost">Show</button>
-            <button id="hideCompare" class="ghost" style="display:none">Hide</button>
-          </div>
-        </div>
-
-        <div>
-          <label>Save / Load</label>
-          <div style="display:flex;gap:8px;margin-top:6px">
-            <button id="exportAll">Download JSON</button>
-            <input id="importFile" type="file" accept="application/json" style="display:none">
-            <button id="importBtn" class="ghost">Load JSON</button>
-          </div>
-        </div>
-
-        <div>
           <label>Statistics</label>
-          <div class="small" id="roadStats">
+          <div class="small">
             Roads: <span id="roadCount">0</span><br>
             Double Roads: <span id="doubleRoadCount">0</span><br>
             Avenues: <span id="avenueCount">0</span><br>
             Weather: <span id="weatherCount">0</span>
           </div>
         </div>
-
       </div>
     </div>
 
     <div class="panel board-wrap">
-      <div class="row-between">
-        <div class="small">Active Level: <span id="activeLabel">Level 1</span></div>
-      </div>
+      <div class="small">Active Level: <span id="activeLabel">Level 1</span></div>
       <div class="boards" id="boardsContainer"></div>
     </div>
   </div>
@@ -150,40 +142,34 @@
       {key:'block', label:'Blocking', emoji:'🚫', class:'block'},
       {key:'mandatory', label:'Mandatory', emoji:'⭐', class:'mandatory'},
       {key:'river', label:'River', emoji:'🌊', class:'river'},
-      {key:'weather', label:'Weather', emoji:'🌦️', class:'weather'},
+      {key:'weather', label:'Weather', emoji:'🌦️', class:'weather'}
     ];
 
     let boards=[]; let activeIndex=0; let brush=null; let mode='cycle'; let isMouseDown=false;
 
-    const colsIn=document.getElementById('cols');
-    const rowsIn=document.getElementById('rows');
     const tileTypesEl=document.getElementById('tileTypes');
     const boardsContainer=document.getElementById('boardsContainer');
-    const newBoardBtn=document.getElementById('newBoard');
-    const duplicateBtn=document.getElementById('duplicate');
-    const clearBtn=document.getElementById('clear');
-    const exportAllBtn=document.getElementById('exportAll');
-    const importBtn=document.getElementById('importBtn');
-    const importFile=document.getElementById('importFile');
-    const modeCycle=document.getElementById('modeCycle');
-    const modeBrush=document.getElementById('modeBrush');
-    const activeLabel=document.getElementById('activeLabel');
+    const colsIn=document.getElementById('cols');
+    const rowsIn=document.getElementById('rows');
 
-    function makeEmptyTiles(cols,rows){return Array.from({length:rows},()=>Array(cols).fill('empty'))}
-    function createBoard(name,cols,rows){return{name,cols,rows,tiles:makeEmptyTiles(cols,rows)}}
+    function makeEmptyGrid(cols,rows){return Array.from({length:rows},()=>Array(cols).fill('empty'))}
+    function createBoard(name,cols,rows){
+      return {name,cols,rows,tiles:makeEmptyGrid(cols,rows),weather:makeEmptyGrid(cols,rows)};
+    }
 
     function setupTileTypes(){
       tileTypesEl.innerHTML='';
       TILE_TYPES.forEach(tt=>{
-        const d=document.createElement('div');
-        d.className='type';d.title=tt.label;d.dataset.key=tt.key;
-        d.innerHTML=`<span class='palette-swatch ${tt.class}'></span> <div>${tt.emoji||''} ${tt.label}</div>`;
-        d.addEventListener('click',()=>{
+        const el=document.createElement('div');
+        el.className='type';el.innerHTML=`<span class='palette-swatch ${tt.class}'></span> ${tt.emoji||''} ${tt.label}`;
+        el.addEventListener('click',()=>{
           document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));
-          d.classList.add('active');brush=tt.key;mode='brush';
-          modeBrush.classList.add('active');modeCycle.classList.remove('active');
+          el.classList.add('active');
+          brush=tt.key; mode='brush';
+          document.getElementById('modeBrush').classList.add('active');
+          document.getElementById('modeCycle').classList.remove('active');
         });
-        tileTypesEl.appendChild(d);
+        tileTypesEl.appendChild(el);
       });
     }
 
@@ -191,29 +177,46 @@
       boardsContainer.innerHTML='';
       const board=boards[activeIndex];
       if(!board)return;
-      activeLabel.textContent=board.name;
       const grid=document.createElement('div');
       grid.className='grid';
       grid.style.gridTemplateColumns=`repeat(${board.cols}, var(--cell-size))`;
 
       for(let r=0;r<board.rows;r++){
         for(let c=0;c<board.cols;c++){
-          const t=board.tiles[r][c]||'empty';
+          const base=board.tiles[r][c];
+          const weather=board.weather[r][c];
           const cell=document.createElement('div');
-          const typeDef=TILE_TYPES.find(x=>x.key===t);
-          cell.className='cell '+t;
-          cell.textContent=typeDef?.emoji||'';
-          if(t==='weather'){
-            const below=board._underlay?.[r]?.[c];
-            if(below && below!=='empty') cell.classList.add('semi');
-            else cell.classList.add('opaque');
+          cell.className='cell '+base;
+
+          // Base emoji
+          const baseDef=TILE_TYPES.find(x=>x.key===base);
+          const baseEmoji=document.createElement('div');
+          baseEmoji.textContent=baseDef?.emoji||'';
+          cell.appendChild(baseEmoji);
+
+          // Weather overlay if exists
+          if(weather==='weather'){
+            const overlay=document.createElement('div');
+            overlay.className='weather-emoji '+(base!=='empty'?'weather-semi':'weather-opaque');
+            overlay.textContent='🌦️';
+            cell.appendChild(overlay);
           }
-          cell.addEventListener('mousedown',()=>{isMouseDown=true;if(mode==='cycle'){cycleCell(r,c);renderBoards();}else if(mode==='brush'){applyBrush(r,c,cell);}});
-          cell.addEventListener('mouseenter',()=>{if(isMouseDown&&mode==='brush'){applyBrush(r,c,cell);}});
-          cell.addEventListener('mouseup',()=>{isMouseDown=false;});
+
+          // Interactions
+          cell.addEventListener('mousedown',()=>{
+            isMouseDown=true;
+            if(mode==='cycle'){cycleCell(r,c);renderBoards();}
+            else if(mode==='brush'){applyBrush(r,c);}
+          });
+          cell.addEventListener('mouseenter',()=>{
+            if(isMouseDown&&mode==='brush'){applyBrush(r,c);}
+          });
+          cell.addEventListener('mouseup',()=>isMouseDown=false);
+
           grid.appendChild(cell);
         }
       }
+
       boardsContainer.appendChild(grid);
       countStats(board);
     }
@@ -222,46 +225,83 @@
       const b=boards[activeIndex];
       const current=b.tiles[r][c];
       const idx=TILE_TYPES.findIndex(x=>x.key===current);
-      const next=TILE_TYPES[(idx+1)%TILE_TYPES.length].key;
-      b.tiles[r][c]=next;
+      b.tiles[r][c]=TILE_TYPES[(idx+1)%TILE_TYPES.length].key;
     }
 
-    function applyBrush(r,c,cell){
-      if(!brush)return;
+    function applyBrush(r,c){
       const b=boards[activeIndex];
-      const prev=b.tiles[r][c];
-      if(brush==='weather'){
-        b._underlay=b._underlay||makeEmptyTiles(b.cols,b.rows);
-        b._underlay[r][c]=prev;
+      if(!brush)return;
+      if(brush==='empty'){
+        b.tiles[r][c]='empty';
+        b.weather[r][c]='empty';
+      } else if(brush==='weather'){
+        b.weather[r][c]=b.weather[r][c]==='weather'?'empty':'weather';
+      } else {
+        b.tiles[r][c]=brush;
       }
-      b.tiles[r][c]=brush;
       renderBoards();
     }
 
-    newBoardBtn.addEventListener('click',()=>{const cols=+colsIn.value||23;const rows=+rowsIn.value||15;boards.push(createBoard(`Level ${boards.length+1}`,cols,rows));activeIndex=boards.length-1;renderBoards();});
-    duplicateBtn.addEventListener('click',()=>{const src=boards[activeIndex];const copy=JSON.parse(JSON.stringify(src));copy.name=src.name+' (copy)';boards.push(copy);activeIndex=boards.length-1;renderBoards();});
-    clearBtn.addEventListener('click',()=>{if(confirm('Clear current level?')){boards[activeIndex].tiles=makeEmptyTiles(boards[activeIndex].cols,boards[activeIndex].rows);renderBoards();}});
-
-    function countStats(board){
-      let road=0,doubleRoad=0,avenue=0,weather=0;
-      for(const row of board.tiles){
-        for(const t of row){
-          if(t==='road')road++;
-          if(t==='doubleRoad')doubleRoad++;
-          if(t==='avenue')avenue++;
-          if(t==='weather')weather++;
+    function countStats(b){
+      let roads=0,droads=0,aves=0,weather=0;
+      for(let r=0;r<b.rows;r++){
+        for(let c=0;c<b.cols;c++){
+          const t=b.tiles[r][c];
+          if(t==='road')roads++;
+          if(t==='doubleRoad')droads++;
+          if(t==='avenue')aves++;
+          if(b.weather[r][c]==='weather')weather++;
         }
       }
-      document.getElementById('roadCount').textContent=road;
-      document.getElementById('doubleRoadCount').textContent=doubleRoad;
-      document.getElementById('avenueCount').textContent=avenue;
+      document.getElementById('roadCount').textContent=roads;
+      document.getElementById('doubleRoadCount').textContent=droads;
+      document.getElementById('avenueCount').textContent=aves;
       document.getElementById('weatherCount').textContent=weather;
     }
 
-    modeCycle.addEventListener('click',()=>{mode='cycle';modeCycle.classList.add('active');modeBrush.classList.remove('active');brush=null;document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));});
-    modeBrush.addEventListener('click',()=>{mode='brush';modeBrush.classList.add('active');modeCycle.classList.remove('active');});
+    document.getElementById('modeCycle').addEventListener('click',()=>{
+      mode='cycle';
+      document.getElementById('modeCycle').classList.add('active');
+      document.getElementById('modeBrush').classList.remove('active');
+      brush=null;
+      document.querySelectorAll('.tile-types .type').forEach(x=>x.classList.remove('active'));
+    });
+    document.getElementById('modeBrush').addEventListener('click',()=>{
+      mode='brush';
+      document.getElementById('modeBrush').classList.add('active');
+      document.getElementById('modeCycle').classList.remove('active');
+    });
 
-    function init(){setupTileTypes();boards=[createBoard('Level 1',+colsIn.value,+rowsIn.value)];renderBoards();}
+    document.getElementById('newBoard').addEventListener('click',()=>{
+      const cols=Math.max(3,Math.min(60,+colsIn.value||23));
+      const rows=Math.max(3,Math.min(60,+rowsIn.value||15));
+      boards.push(createBoard('Level '+(boards.length+1),cols,rows));
+      activeIndex=boards.length-1;
+      renderBoards();
+    });
+
+    document.getElementById('duplicate').addEventListener('click',()=>{
+      const src=boards[activeIndex];
+      const copy=JSON.parse(JSON.stringify(src));
+      copy.name=src.name+' (copy)';
+      boards.push(copy);
+      activeIndex=boards.length-1;
+      renderBoards();
+    });
+
+    document.getElementById('clear').addEventListener('click',()=>{
+      if(!confirm('Clear current level?'))return;
+      const b=boards[activeIndex];
+      b.tiles=makeEmptyGrid(b.cols,b.rows);
+      b.weather=makeEmptyGrid(b.cols,b.rows);
+      renderBoards();
+    });
+
+    function init(){
+      setupTileTypes();
+      boards=[createBoard('Level 1',+colsIn.value,+rowsIn.value)];
+      renderBoards();
+    }
     init();
   </script>
 </body>
